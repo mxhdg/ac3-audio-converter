@@ -1,18 +1,19 @@
 # AC3 Audio Batch Converter
 
-A simple, standalone Docker-based batch converter that recursively scans a directory for media files and converts their audio tracks to AC-3 while preserving video and subtitle streams. Designed for manual runs, cron jobs, or external automation — no Sonarr/Radarr integration required.
+A standalone, Docker‑based batch converter that recursively scans a directory for media files and converts their audio tracks to AC‑3 while preserving video and subtitle streams. Designed for manual runs, cron jobs, or external automation. No Sonarr/Radarr integration required.
 
 ---
 
 ## Features
 
-- Recursively scans all subfolders under a parent directory
-- Converts audio to AC-3 (`640k`) while copying video and subtitles
-- Atomic file replacement (safe overwrite)
-- Logs all operations to a host-mounted directory
-- Runs once and exits — perfect for batch jobs
-- Lightweight Alpine-based container
-- Triggered via environment variable (`TARGET_PATH`)
+- **Recursive directory scanning** — processes all subfolders under a parent directory
+- **Multi‑threaded ffmpeg** — automatically uses all available CPU cores
+- **Atomic file replacement** — safe overwrite only after successful conversion
+- **Progress tracking** — shows `[current/total]` for each file
+- **ETA calculation** — estimates remaining time based on average processing speed
+- **Detailed logging** — logs written to a host‑mounted directory
+- **Environment‑variable driven** — no command‑line arguments required
+- **Lightweight Alpine container** — minimal footprint, fast startup
 
 ---
 
@@ -73,13 +74,16 @@ You can modify this list in `ac3convert.sh`.
 ## How It Works
 
 1. The container starts and reads `TARGET_PATH`.
-2. It recursively finds all media files under that directory.
+2. It recursively finds all supported media files.
 3. For each file:
-   - Video and subtitles are copied as-is
-   - Audio is converted to AC-3 at 640k
+   - Video and subtitles are copied as‑is
+   - Audio is converted to AC‑3 at 640k
    - A temporary file is created
    - The original file is atomically replaced
-4. A detailed log is written to `/logs`.
+4. After each file, the script logs:
+   - Progress (`[current/total]`)
+   - ETA based on average processing time
+5. A detailed log is written to `/logs`.
 
 ---
 
@@ -116,7 +120,7 @@ docker run --rm \
 
 ---
 
-## GitHub Actions (Tag-Only Releases)
+## GitHub Actions (Tag‑Only Releases)
 
 This project only publishes Docker images when a **semantic version tag** is pushed:
 
