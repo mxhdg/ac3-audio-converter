@@ -1,0 +1,34 @@
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# macOS junk
+.DS_Store
+
+# Linux editor junk
+*~
+*.bak
+
+# Docker build artifacts
+docker-compose.override.yml
+.env
+
+# Python cache (if you ever add tooling)
+__pycache__/
+*.pyc
+
+# VS Code settings
+.vscode/
+
+# JetBrains IDEs
+.idea/
+
+# Shell script backups
+*.sh~
+*.sh.bak
