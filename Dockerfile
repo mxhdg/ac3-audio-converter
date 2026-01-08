@@ -1,32 +1,15 @@
-FROM debian:stable-slim
+FROM alpine:3.19
 
-# Install ffmpeg + dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ffmpeg \
-        ca-certificates \
-        bash \
-        coreutils && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Install ffmpeg
+RUN apk add --no-cache ffmpeg bash
 
-# Create non-root user
-RUN groupadd -g 1000 converter && \
-    useradd -u 1000 -g converter -m converter
+# Create mod directory structure
+RUN mkdir -p /mod/usr/local/bin
 
-# Create log directory
-RUN mkdir -p /logs && chown converter:converter /logs
+# Copy the conversion script into the mod path
+COPY ac3convert.sh /mod/usr/local/bin/ac3convert
 
-# Copy conversion script
-COPY ac3convert.sh /usr/local/bin/ac3convert.sh
-RUN chmod +x /usr/local/bin/ac3convert.sh && \
-    chown converter:converter /usr/local/bin/ac3convert.sh
+# Ensure the script is executable
+RUN chmod +x /mod/usr/local/bin/ac3convert
 
-# Expose volumes
-VOLUME ["/media", "/logs"]
-
-# Switch to non-root user
-USER converter
-
-# Run the converter script by default
-ENTRYPOINT ["/usr/local/bin/ac3convert.sh"]
+# No entrypoint needed — this is a LinuxServer Mod
