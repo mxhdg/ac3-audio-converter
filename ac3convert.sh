@@ -1,47 +1,54 @@
 #!/bin/bash
 
-# Determine whether this was called by Sonarr or Radarr
-# Sonarr provides: $sonarr_episodefile_path
-# Radarr provides: $radarr_moviefile_path
+# Read the parent directory from environment variable
+ROOT="${TARGET_PATH}"
 
-if [ -n "$sonarr_episodefile_path" ]; then
-    INPUT="$sonarr_episodefile_path"
-    SOURCE="Sonarr"
-elif [ -n "$radarr_moviefile_path" ]; then
-    INPUT="$radarr_moviefile_path"
-    SOURCE="Radarr"
-else
-    echo "No valid Sonarr or Radarr environment variable found."
+if [ -z "$ROOT" ]; then
+    echo "ERROR: TARGET_PATH environment variable is not set."
+    echo "Usage: docker run -e TARGET_PATH=/path -v /path:/path image"
     exit 1
 fi
 
-# Logging directory
-LOG_DIR="/config/logs/ac3-audio-converter"
+if [ ! -d "$ROOT" ]; then
+    echo "ERROR: Directory not found: $ROOT"
+    exit 1
+fi
+
+# Logging directory (host-mount recommended)
+LOG_DIR="/logs"
 mkdir -p "$LOG_DIR"
 
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-LOG_FILE="$LOG_DIR/convert_$TIMESTAMP.log"
+LOG_FILE="$LOG_DIR/batch_$TIMESTAMP.log"
 
-echo "[$SOURCE] Starting AC3 conversion for: $INPUT" | tee -a "$LOG_FILE"
+echo "Starting batch AC3 conversion in: $ROOT" | tee -a "$LOG_FILE"
 
-# Extract directory and filename
-DIR=$(dirname "$INPUT")
-FILE=$(basename "$INPUT")
-EXT="${FILE##*.}"
-BASE="${FILE%.*}"
+# File extensions to process
+EXTS="mkv mp4 mov avi"
 
-TEMP_OUTPUT="$DIR/${BASE}_ac3.$EXT"
+# Loop through all media files recursively
+for ext in $EXTS; do
+    find "$ROOT" -type f -name "*.$ext" | while read -r INPUT; do
 
-# Run ffmpeg conversion
-ffmpeg -i "$INPUT" -map 0 -c:v copy -c:a ac3 -b:a 640k -c:s copy "$TEMP_OUTPUT" -y &>> "$LOG_FILE"
+        echo "Processing: $INPUT" | tee -a "$LOG_FILE"
 
-if [ $? -ne 0 ]; then
-    echo "FFmpeg conversion failed" | tee -a "$LOG_FILE"
-    exit 1
-fi
+        DIR=$(dirname "$INPUT")
+        FILE=$(basename "$INPUT")
+        BASE="${FILE%.*}"
+        TEMP_OUTPUT="$DIR/${BASE}_ac3.${FILE##*.}"
 
-# Atomic replacement
-mv -f "$TEMP_OUTPUT" "$INPUT"
+        ffmpeg -i "$INPUT" -map 0 -c:v copy -c:a ac3 -b:a 640k -c:s copy "$TEMP_OUTPUT" -y &>> "$LOG_FILE"
 
-echo "[$SOURCE] Conversion complete and file replaced successfully" | tee -a "$LOG_FILE"
+        if [ $? -ne 0 ]; then
+            echo "FFmpeg failed for: $INPUT" | tee -a "$LOG_FILE"
+            rm -f "$TEMP_OUTPUT"
+            continue
+        fi
+
+        mv -f "$TEMP_OUTPUT" "$INPUT"
+        echo "Converted: $INPUT" | tee -a "$LOG_FILE"
+    done
+done
+
+echo "Batch conversion complete." | tee -a "$LOG_FILE"
 exit 0

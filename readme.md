@@ -1,188 +1,140 @@
-# AC3 Audio Converter (LinuxServer Mod Compatible)
+# AC3 Audio Batch Converter
 
-A lightweight, reliable AC‑3 audio conversion tool designed for automated post‑processing in **Sonarr** and **Radarr**.
-This project is packaged as a **LinuxServer Mod**, meaning it integrates directly into the official `linuxserver/sonarr` and `linuxserver/radarr` containers without requiring Docker‑in‑Docker, socket mounts, or external scripts.
-
-The converter runs **inside** the Sonarr/Radarr container and is triggered via the built‑in **Custom Script** connection.
+A simple, standalone Docker-based batch converter that recursively scans a directory for media files and converts their audio tracks to AC-3 while preserving video and subtitle streams. Designed for manual runs, cron jobs, or external automation — no Sonarr/Radarr integration required.
 
 ---
 
 ## Features
 
-- Converts audio tracks to **AC‑3 (Dolby Digital)** using ffmpeg
-- Preserves video and subtitle streams
-- Performs **atomic replacement** of the original file
-- Logs all conversions to `/config/logs/ac3-audio-converter`
-- Works seamlessly with:
-  - LinuxServer Sonarr
-  - LinuxServer Radarr
-  - DOCKER_MODS system
-- Versioned and published automatically via GitHub Actions + GHCR
+- Recursively scans all subfolders under a parent directory
+- Converts audio to AC-3 (`640k`) while copying video and subtitles
+- Atomic file replacement (safe overwrite)
+- Logs all operations to a host-mounted directory
+- Runs once and exits — perfect for batch jobs
+- Lightweight Alpine-based container
+- Triggered via environment variable (`TARGET_PATH`)
 
 ---
 
-## Installation (LinuxServer Mods)
+## Usage
 
-Add the mod to your Sonarr or Radarr container using the `DOCKER_MODS` environment variable.
+### Basic Run
 
-### Sonarr
+Mount your media directory and pass it as `TARGET_PATH`:
 
-```
--e DOCKER_MODS=linuxserver/mods:sonarr-striptracks,ghcr.io/mxhdg/ac3-audio-converter:latest
-```
-
-### Radarr
-
-```
--e DOCKER_MODS=linuxserver/mods:radarr-striptracks,ghcr.io/mxhdg/ac3-audio-converter:latest
+```bash
+docker run --rm \
+  -e TARGET_PATH="/data" \
+  -v /data:/data \
+  ghcr.io/mxhdg/ac3-audio-converter:latest
 ```
 
-LinuxServer will automatically:
+### With Logging
 
-- pull the mod image
-- extract `/mod/usr/local/bin/ac3convert`
-- place it into `/usr/local/bin/ac3convert` inside the container
+Mount a log directory to persist logs:
 
-No additional configuration is required.
+```bash
+docker run --rm \
+  -e TARGET_PATH="/data" \
+  -v /data:/data \
+  -v /DATA/AppData/ac3/logs:/logs \
+  ghcr.io/mxhdg/ac3-audio-converter:latest
+```
+
+Logs will be written to:
+
+```
+/logs/batch_YYYY-MM-DD_HH-MM-SS.log
+```
 
 ---
 
-## Sonarr Setup (Custom Script)
+## Supported File Types
 
-1. Go to **Settings → Connect**
-2. Click **Add → Custom Script**
-3. Configure:
+The converter processes the following extensions:
 
-**Path:**
-```
-/usr/local/bin/ac3convert
-```
+- `.mkv`
+- `.mp4`
+- `.mov`
+- `.avi`
 
-**Arguments:**
-```
-"$episode_file_path"
-```
-
-**Triggers:**
-- On Import
-- On Upgrade (recommended)
+You can modify this list in `ac3convert.sh`.
 
 ---
 
-## Radarr Setup (Custom Script)
+## Environment Variables
 
-1. Go to **Settings → Connect**
-2. Click **Add → Custom Script**
-3. Configure:
-
-**Path:**
-```
-/usr/local/bin/ac3convert
-```
-
-**Arguments:**
-```
-"$movie_file_path"
-```
-
-**Triggers:**
-- On Import
-- On Upgrade (recommended)
-
----
-
-## Logging
-
-All logs are written to:
-
-```
-/config/logs/ac3-audio-converter/
-```
-
-Each run generates a timestamped log file for easy debugging.
+| Variable      | Description                                      | Required |
+|---------------|--------------------------------------------------|----------|
+| `TARGET_PATH` | The parent directory to recursively scan         | Yes      |
 
 ---
 
 ## How It Works
 
-When Sonarr or Radarr imports a file, it calls:
-
-```
-/usr/local/bin/ac3convert <full_path_to_media_file>
-```
-
-The script:
-
-1. Reads the input file
-2. Creates a temporary AC‑3‑encoded version
-3. Atomically replaces the original file
-4. Logs the entire process
-
-Because the script runs *inside* the Sonarr/Radarr container, it sees the same media paths the application sees — no path translation required.
+1. The container starts and reads `TARGET_PATH`.
+2. It recursively finds all media files under that directory.
+3. For each file:
+   - Video and subtitles are copied as-is
+   - Audio is converted to AC-3 at 640k
+   - A temporary file is created
+   - The original file is atomically replaced
+4. A detailed log is written to `/logs`.
 
 ---
 
-## Versioning & Releases
+## Example Cron Job
 
-This project uses **semantic versioning** and publishes images to GHCR.
+Run the converter nightly:
 
-To cut a release:
-
-```
-git tag v1.0.0
-git push --tags
-```
-
-GitHub Actions automatically builds and publishes:
-
-- `v1.0.0`
-- `v1.0`
-- `v1`
-- `latest`
-- `sha-<commit>`
-
-Images are available at:
-
-```
-ghcr.io/mxhdg/ac3-audio-converter
+```bash
+0 3 * * * docker run --rm \
+  -e TARGET_PATH="/data" \
+  -v /data:/data \
+  -v /DATA/AppData/ac3/logs:/logs \
+  ghcr.io/mxhdg/ac3-audio-converter:latest
 ```
 
 ---
 
 ## Development
 
-The mod image places the script here:
+### Build Locally
 
-```
-/mod/usr/local/bin/ac3convert
-```
-
-LinuxServer automatically copies this into:
-
-```
-/usr/local/bin/ac3convert
+```bash
+docker build -t ac3-audio-converter .
 ```
 
-inside the Sonarr/Radarr container.
+### Run Locally
 
-To update the script:
-
-1. Modify `ac3convert.sh`
-2. Build and push a new version
-3. Tag a release
-4. Restart Sonarr/Radarr to pull the updated mod
+```bash
+docker run --rm \
+  -e TARGET_PATH="/data" \
+  -v /data:/data \
+  ac3-audio-converter
+```
 
 ---
 
-## Requirements
+## GitHub Actions (Tag-Only Releases)
 
-- LinuxServer Sonarr or Radarr container
-- ffmpeg (installed automatically by the mod)
-- DOCKER_MODS enabled
+This project only publishes Docker images when a **semantic version tag** is pushed:
+
+```bash
+git tag v1.0.0
+git push --tags
+```
+
+The workflow will:
+
+- Build the container
+- Tag it with semantic versions
+- Push it to GHCR
+
+No builds occur on normal commits.
 
 ---
 
 ## License
 
-MIT License.
-Feel free to fork, modify, and integrate into your own automation workflows.
+MIT License. Use freely and modify as needed.
