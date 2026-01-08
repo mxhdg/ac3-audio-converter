@@ -1,13 +1,4 @@
-FROM alpine:3.19
+FROM scratch
 
-# Install ffmpeg and bash
-RUN apk add --no-cache ffmpeg bash
-
-# Create ONLY the mod directory
-RUN mkdir -p /mod/usr/local/bin
-
-# Copy your script into the mod path
+# Place ONLY the mod directory in the image
 COPY ac3convert.sh /mod/usr/local/bin/ac3convert
-
-# Make it executable
-RUN chmod +x /mod/usr/local/bin/ac3convert
