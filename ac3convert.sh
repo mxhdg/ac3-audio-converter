@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Read the parent directory from environment variable
+# Parent directory passed via environment variable
 ROOT="${TARGET_PATH}"
 
 if [ -z "$ROOT" ]; then
@@ -14,7 +14,7 @@ if [ ! -d "$ROOT" ]; then
     exit 1
 fi
 
-# Logging directory (host-mount recommended)
+# Logging directory (host-mounted recommended)
 LOG_DIR="/logs"
 mkdir -p "$LOG_DIR"
 
@@ -25,6 +25,11 @@ echo "Starting batch AC3 conversion in: $ROOT" | tee -a "$LOG_FILE"
 
 # File extensions to process
 EXTS="mkv mp4 mov avi"
+
+# Determine number of CPU cores for ffmpeg threading
+THREADS=$(nproc)
+
+echo "Using $THREADS threads per file" | tee -a "$LOG_FILE"
 
 # Loop through all media files recursively
 for ext in $EXTS; do
@@ -37,7 +42,14 @@ for ext in $EXTS; do
         BASE="${FILE%.*}"
         TEMP_OUTPUT="$DIR/${BASE}_ac3.${FILE##*.}"
 
-        ffmpeg -i "$INPUT" -map 0 -c:v copy -c:a ac3 -b:a 640k -c:s copy "$TEMP_OUTPUT" -y &>> "$LOG_FILE"
+        # Multi-threaded ffmpeg conversion
+        ffmpeg -threads "$THREADS" \
+            -i "$INPUT" \
+            -map 0 \
+            -c:v copy \
+            -c:a ac3 -b:a 640k \
+            -c:s copy \
+            "$TEMP_OUTPUT" -y &>> "$LOG_FILE"
 
         if [ $? -ne 0 ]; then
             echo "FFmpeg failed for: $INPUT" | tee -a "$LOG_FILE"
@@ -45,6 +57,7 @@ for ext in $EXTS; do
             continue
         fi
 
+        # Atomic replacement
         mv -f "$TEMP_OUTPUT" "$INPUT"
         echo "Converted: $INPUT" | tee -a "$LOG_FILE"
     done
