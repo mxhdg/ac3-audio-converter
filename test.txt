@@ -1,5 +1,0 @@
-run --rm \
-  -v ./media:/media \
-  -v ./logs:/logs \
-  heather/ac3-audio-converter:test \
-  "/media/SomeMovie.mkv"
