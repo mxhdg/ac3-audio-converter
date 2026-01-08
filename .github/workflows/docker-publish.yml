@@ -2,10 +2,8 @@ name: Build and Publish Docker Image
 
 on:
   push:
-    branches: [ "main" ]
     tags:
-      - "v*.*.*"
-  workflow_dispatch:
+      - "v*.*.*"   # Only run on semantic version tags like v1.0.0
 
 jobs:
   build-and-push:
@@ -32,11 +30,10 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=sha
-            type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=sha
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
